@@ -106,6 +106,35 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       }
     }
 
+    // Final Resort: Raw Fetch if all SDK attempts fail
+    if (!text) {
+      console.log("SDK failed, attempting raw REST API call...");
+      try {
+        let apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        if (apiKey) {
+          apiKey = apiKey.trim();
+          // Try gemini-1.5-flash as it is the most likely to work
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
+
+          if (response.ok) {
+            const json = await response.json();
+            text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            if (text) console.log("Success with raw REST API");
+          } else {
+            console.error("Raw REST API failed:", await response.text());
+          }
+        }
+      } catch (rawError) {
+        console.error("Raw REST API unexpected error:", rawError);
+      }
+    }
+
     if (!text && lastError) {
       throw lastError;
     }
