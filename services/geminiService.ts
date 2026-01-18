@@ -74,9 +74,11 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     3. 语言要温暖、积极、赋能，避免说教和焦虑贩卖。
     4. 任务应该是微习惯，简单易执行。`;
 
-    // Only try the most reliable model to debug the specific error
+    // Updated with models CONFIRMED to exist by ListModels debug
     const modelsToTry = [
-      "gemini-1.5-flash"
+      "gemini-2.0-flash",
+      "gemini-2.5-flash",
+      "gemini-flash-latest"
     ];
 
     let text = "";
