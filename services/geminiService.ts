@@ -47,10 +47,6 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       return getFallbackData(`CLT_ERR: Key ${keyStatus} (Check VITE_GEMINI_API_KEY)`);
     }
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-pro",
-    });
-
     const prompt = `你是一位擅长积极心理学的资深生活教练，善于通过"成长型思维"和"优势视角"来激发用户的潜能。
     
     请根据以下用户的生命维度评分（当前 vs 目标），为差距最大的前三个领域制定具体的年度行动计划。
@@ -74,9 +70,45 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     3. 语言要温暖、积极、赋能，避免说教和焦虑贩卖。
     4. 任务应该是微习惯，简单易执行。`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const modelsToTry = [
+      "gemini-1.5-flash",
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash-001",
+      "gemini-pro",
+      "gemini-1.0-pro",
+      "gemini-1.5-pro"
+    ];
+
+    let lastError;
+    let text = "";
+
+    // Retry loop for multiple models
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Attempting to generate plan with model: ${modelName}`);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        text = response.text();
+
+        if (text) {
+          console.log(`Success with model: ${modelName}`);
+          break; // Exit loop on success
+        }
+      } catch (e: any) {
+        console.warn(`Model ${modelName} failed:`, e.message);
+        lastError = e;
+        // Continue to next model
+        if (e.message.includes('403') || e.message.includes('API key')) {
+          // If it's a key error, no need to retry other models
+          throw e;
+        }
+      }
+    }
+
+    if (!text && lastError) {
+      throw lastError;
+    }
 
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
     const data = JSON.parse(cleanText || "[]");
