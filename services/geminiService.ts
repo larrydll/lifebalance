@@ -1,20 +1,18 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { Dimension, ActionPlanItem } from "../types";
 
 // Initialize client lazily to prevent app crash if API key is missing
-const getAiClient = () => {
+const getGenAI = () => {
   // Try standard Vite env var first, then fallback to process.env injection
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
 
   if (!apiKey || apiKey === 'undefined') {
-    console.warn("Gemini API Key is missing or invalid");
     return null;
   }
   try {
-    return new GoogleGenAI({ apiKey });
+    return new GoogleGenerativeAI(apiKey);
   } catch (error) {
-    console.error("Failed to initialize GoogleGenAI:", error);
+    console.error("Failed to initialize GoogleGenerativeAI:", error);
     return null;
   }
 };
@@ -40,14 +38,37 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
   }));
 
   try {
-    const ai = getAiClient();
+    const genAI = getGenAI();
 
-    if (!ai) {
+    if (!genAI) {
       console.log("Using fallback data due to missing AI client");
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
       const keyStatus = apiKey ? (apiKey === 'undefined' ? 'UNDEFINED_STRING' : 'PRESENT') : 'MISSING';
       return getFallbackData(`CLT_ERR: Key ${keyStatus} (Check VITE_GEMINI_API_KEY)`);
     }
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: SchemaType.ARRAY,
+          items: {
+            type: SchemaType.OBJECT,
+            properties: {
+              category: { type: SchemaType.STRING },
+              title: { type: SchemaType.STRING },
+              status: { type: SchemaType.STRING },
+              tasks: {
+                type: SchemaType.ARRAY,
+                items: { type: SchemaType.STRING }
+              }
+            },
+            required: ["category", "title", "status", "tasks"]
+          }
+        }
+      }
+    });
 
     const prompt = `你是一位擅长积极心理学的资深生活教练，善于通过"成长型思维"和"优势视角"来激发用户的潜能。
     
@@ -72,31 +93,11 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     3. 语言要温暖、积极、赋能，避免说教和焦虑贩卖。
     4. 任务应该是微习惯，简单易执行。`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-001",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              category: { type: Type.STRING },
-              title: { type: Type.STRING },
-              status: { type: Type.STRING },
-              tasks: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              }
-            },
-            required: ["category", "title", "status", "tasks"]
-          }
-        }
-      }
-    });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-    const data = JSON.parse(response.text || "[]");
+    const data = JSON.parse(text || "[]");
 
     // Map with image placeholders
     const images = [
