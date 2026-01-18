@@ -32,20 +32,24 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     gap: g.gap,
     status: (g.gap > 5 ? 'critical' : g.gap > 2 ? 'steady' : 'moderate') as 'critical' | 'steady' | 'moderate',
     tasks: errorMsg && idx === 0
-      ? [`错误详情: ${errorMsg}`, "请检查 API Key 配置", "请确保已重新部署 (Redeploy)"]
+      ? [`错误详情: ${errorMsg}`, "请检查 API Key 和 代理配置", "请确保已重新部署 (Redeploy)"]
       : [`提升${g.name}的具体方案1`, `提升${g.name}的具体方案2`, `提升${g.name}的具体方案3`],
     imageUrl: "https://picsum.photos/400/200"
   }));
 
   try {
-    const genAI = getGenAI();
+    let apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+    // Normalize Base URL: remove trailing slash
+    // Hardcoded user's proxy as fallback to ensure it works even if Env Var fails
+    let baseUrl = import.meta.env.VITE_GEMINI_API_BASE_URL || 'https://throbbing-lab-8b07.dailinlong.workers.dev' || '/api/proxy';
+    if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
-    if (!genAI) {
-      console.log("Using fallback data due to missing AI client");
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
-      const keyStatus = apiKey ? (apiKey === 'undefined' ? 'UNDEFINED_STRING' : 'PRESENT') : 'MISSING';
-      return getFallbackData(`CLT_ERR: Key ${keyStatus} (Check VITE_GEMINI_API_KEY)`);
+    const isCustomProxy = baseUrl && !baseUrl.includes('googleapis.com');
+
+    if (!apiKey || apiKey === 'undefined') {
+      return getFallbackData("API Key MISSING");
     }
+    apiKey = apiKey.trim();
 
     const prompt = `你是一位擅长积极心理学的资深生活教练，善于通过"成长型思维"和"优势视角"来激发用户的潜能。
     
@@ -79,63 +83,79 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       "gemini-1.5-pro"
     ];
 
-    let lastError;
     let text = "";
+    let lastError;
 
-    // Retry loop for multiple models
-    for (const modelName of modelsToTry) {
-      try {
-        console.log(`Attempting to generate plan with model: ${modelName}`);
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        text = response.text();
-
-        if (text) {
-          console.log(`Success with model: ${modelName}`);
-          break; // Exit loop on success
-        }
-      } catch (e: any) {
-        console.warn(`Model ${modelName} failed:`, e.message);
-        lastError = e;
-        // Continue to next model
-        if (e.message.includes('403') || e.message.includes('API key')) {
-          // If it's a key error, no need to retry other models
-          throw e;
-        }
-      }
-    }
-
-    // Final Resort: Raw Fetch if all SDK attempts fail
-    if (!text) {
-      console.log("SDK failed, attempting raw REST API call...");
-      try {
-        let apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
-        // Allow custom Base URL for proxies (to bypass Vercel IP blocks)
-        // Default to /api/proxy which is handled by vercel.json rewrites or vite proxy
-        const baseUrl = import.meta.env.VITE_GEMINI_API_BASE_URL || '/api/proxy';
-
-        if (apiKey) {
-          apiKey = apiKey.trim();
-          // Try gemini-1.5-flash as it is the most likely to work
-          const response = await fetch(`${baseUrl}/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    // STRATEGY 1: Proxy Mode (Raw Fetch) - Prioritize if Base URL is set
+    if (isCustomProxy) {
+      console.log(`Using Proxy Mode: ${baseUrl}`);
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`Proxy Attempt: ${modelName}`);
+          const response = await fetch(`${baseUrl}/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }]
-            })
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
           });
 
           if (response.ok) {
             const json = await response.json();
             text = json.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            if (text) console.log("Success with raw REST API");
+            if (text) {
+              console.log(`Success with proxy model: ${modelName}`);
+              break;
+            }
           } else {
-            console.error("Raw REST API failed:", await response.text());
+            const errText = await response.text();
+            console.warn(`Proxy ${modelName} failed:`, errText);
+            lastError = new Error(`Proxy Error [${response.status}]: ${errText.slice(0, 50)}`);
+          }
+        } catch (e: any) {
+          console.warn(`Proxy ${modelName} connection error:`, e);
+          lastError = e;
+        }
+      }
+    }
+
+    // STRATEGY 2: SDK Mode (Fallback or Primary if no proxy)
+    // Only run if Proxy Mode failed or wasn't used
+    if (!text) {
+      // If we already tried proxy and failed, stop here to avoid confusing SDK errors
+      // unless user explicitly wants fallback. But for Vercel, SDK is guaranteed to fail.
+      if (isCustomProxy && lastError) {
+        console.log("Proxy mode failed, not attempting SDK due to custom proxy setting.");
+        throw lastError;
+      }
+
+      // ... strict SDK logic removed for brevity, assuming Proxy Mode is the fix ...
+      // But keeping it for backward compat if proxy not set
+      const genAI = getGenAI();
+      if (genAI) {
+        console.log("Attempting SDK mode...");
+        for (const modelName of modelsToTry) {
+          try {
+            console.log(`SDK Attempt: ${modelName}`);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            text = response.text();
+            if (text) {
+              console.log(`Success with SDK model: ${modelName}`);
+              break;
+            }
+          } catch (e: any) {
+            console.warn(`SDK ${modelName} failed:`, e.message);
+            lastError = e;
+            if (e.message.includes('403') || e.message.includes('API key')) {
+              // If it's a key error, no need to retry other models
+              throw e;
+            }
           }
         }
-      } catch (rawError) {
-        console.error("Raw REST API unexpected error:", rawError);
+      } else {
+        console.log("Using fallback data due to missing AI client (SDK not initialized)");
+        const keyStatus = apiKey ? (apiKey === 'undefined' ? 'UNDEFINED_STRING' : 'PRESENT') : 'MISSING';
+        return getFallbackData(`CLT_ERR: Key ${keyStatus} (Check VITE_GEMINI_API_KEY)`);
       }
     }
 
