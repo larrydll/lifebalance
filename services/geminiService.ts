@@ -108,7 +108,7 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
           } else {
             const errText = await response.text();
             console.warn(`Proxy ${modelName} failed:`, errText);
-            lastError = new Error(`Proxy Error [${response.status}]: ${errText.slice(0, 50)}`);
+            lastError = new Error(`Proxy Error [${response.status}]: ${errText.slice(0, 500)}`);
           }
         } catch (e: any) {
           console.warn(`Proxy ${modelName} connection error:`, e);
