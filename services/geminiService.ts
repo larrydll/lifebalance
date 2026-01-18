@@ -4,7 +4,9 @@ import { Dimension, ActionPlanItem } from "../types";
 
 // Initialize client lazily to prevent app crash if API key is missing
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  // Try standard Vite env var first, then fallback to process.env injection
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+
   if (!apiKey || apiKey === 'undefined') {
     console.warn("Gemini API Key is missing or invalid");
     return null;
@@ -42,8 +44,9 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
 
     if (!ai) {
       console.log("Using fallback data due to missing AI client");
-      const keyStatus = process.env.API_KEY ? (process.env.API_KEY === 'undefined' ? 'UNDEFINED_STRING' : 'PRESENT') : 'MISSING';
-      return getFallbackData(`CLT_ERR: Key ${keyStatus}`);
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+      const keyStatus = apiKey ? (apiKey === 'undefined' ? 'UNDEFINED_STRING' : 'PRESENT') : 'MISSING';
+      return getFallbackData(`CLT_ERR: Key ${keyStatus} (Check VITE_GEMINI_API_KEY)`);
     }
 
     const prompt = `你是一位擅长积极心理学的资深生活教练，善于通过"成长型思维"和"优势视角"来激发用户的潜能。
