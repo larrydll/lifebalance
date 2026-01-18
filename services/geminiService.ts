@@ -76,11 +76,7 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
 
     const modelsToTry = [
       "gemini-1.5-flash",
-      "gemini-1.5-flash-latest",
-      "gemini-1.5-flash-001",
-      "gemini-pro",
-      "gemini-1.0-pro",
-      "gemini-1.5-pro"
+      "gemini-pro"
     ];
 
     let text = "";
