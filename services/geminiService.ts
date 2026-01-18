@@ -43,7 +43,9 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       return getFallbackData();
     }
 
-    const prompt = `你是一位专业的生活教练。根据以下生命维度评分（当前 vs 目标），为差距最大的前三个领域制定一个具体的年度行动计划。
+    const prompt = `你是一位擅长积极心理学的资深生活教练，善于通过"成长型思维"和"优势视角"来激发用户的潜能。
+    
+    请根据以下用户的生命维度评分（当前 vs 目标），为差距最大的前三个领域制定具体的年度行动计划。
     
     领域评分:
     ${gaps.map(g => `${g.name}: 当前 ${g.currentScore}, 目标 ${g.targetScore}, 差距 ${g.gap}`).join('\n')}
@@ -52,12 +54,17 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     [
       {
         "category": "领域名称",
-        "title": "标题 (例如: 精神成长: 差距为 7)",
+        "title": "充满力量的行动标题 (例如: 开启心流体验之旅)",
         "status": "critical | steady | moderate",
-        "tasks": ["任务1", "任务2", "任务3"]
+        "tasks": ["积极行动1", "积极行动2", "积极行动3"]
       }
     ]
-    任务应该是具体、可操作的习惯。`;
+    
+    要求：
+    1. 每一项必须严格包含 3 个具体的行动方案。
+    2. 方案应融合积极心理学概念（如：感恩、心流、优势运用、社会支持）。
+    3. 语言要温暖、积极、赋能，避免说教和焦虑贩卖。
+    4. 任务应该是微习惯，简单易执行。`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
