@@ -23,15 +23,17 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     .sort((a, b) => b.gap - a.gap)
     .slice(0, 3);
 
-  // Fallback function for static data
-  const getFallbackData = (): ActionPlanItem[] => gaps.map((g, idx) => ({
+  // Fallback function for static data with debug info
+  const getFallbackData = (errorMsg?: string): ActionPlanItem[] => gaps.map((g, idx) => ({
     id: `plan-${idx}`,
     category: g.name,
-    title: `${g.name}: 差距为 ${g.gap}`,
+    title: errorMsg && idx === 0 ? `调试报错: ${errorMsg.slice(0, 20)}...` : `${g.name}: 差距为 ${g.gap}`,
     priority: idx + 1,
     gap: g.gap,
     status: (g.gap > 5 ? 'critical' : g.gap > 2 ? 'steady' : 'moderate') as 'critical' | 'steady' | 'moderate',
-    tasks: [`提升${g.name}的具体方案1`, `提升${g.name}的具体方案2`, `提升${g.name}的具体方案3`],
+    tasks: errorMsg && idx === 0
+      ? [`错误详情: ${errorMsg}`, "请检查 API Key 配置", "请确保已重新部署 (Redeploy)"]
+      : [`提升${g.name}的具体方案1`, `提升${g.name}的具体方案2`, `提升${g.name}的具体方案3`],
     imageUrl: "https://picsum.photos/400/200"
   }));
 
@@ -40,7 +42,8 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
 
     if (!ai) {
       console.log("Using fallback data due to missing AI client");
-      return getFallbackData();
+      const keyStatus = process.env.API_KEY ? (process.env.API_KEY === 'undefined' ? 'UNDEFINED_STRING' : 'PRESENT') : 'MISSING';
+      return getFallbackData(`CLT_ERR: Key ${keyStatus}`);
     }
 
     const prompt = `你是一位擅长积极心理学的资深生活教练，善于通过"成长型思维"和"优势视角"来激发用户的潜能。
@@ -107,8 +110,8 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       imageUrl: images[idx % images.length],
       status: item.status as 'critical' | 'steady' | 'moderate'
     }));
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Plan Generation Error:", error);
-    return getFallbackData();
+    return getFallbackData(error.message || "Unknown API Error");
   }
 };
