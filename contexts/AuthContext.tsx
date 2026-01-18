@@ -28,19 +28,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
+
+        // Timeout to prevent infinite loading if Supabase connection fails
+        const timeout = setTimeout(() => {
+            if (isMounted && loading) {
+                console.warn('Auth check timed out, proceeding without user');
+                setLoading(false);
+            }
+        }, 3000);
+
         // Check current user on mount
-        getCurrentUser().then((currentUser) => {
-            setUser(currentUser);
-            setLoading(false);
-        });
+        getCurrentUser()
+            .then((currentUser) => {
+                if (isMounted) {
+                    setUser(currentUser);
+                    setLoading(false);
+                }
+            })
+            .catch((error) => {
+                console.error('Error getting current user:', error);
+                if (isMounted) {
+                    setLoading(false);
+                }
+            });
 
         // Subscribe to auth state changes
         const unsubscribe = onAuthStateChange((authUser) => {
-            setUser(authUser);
-            setLoading(false);
+            if (isMounted) {
+                setUser(authUser);
+                setLoading(false);
+            }
         });
 
-        return unsubscribe;
+        return () => {
+            isMounted = false;
+            clearTimeout(timeout);
+            unsubscribe();
+        };
     }, []);
 
     const handleSignIn = async (email: string, password: string) => {

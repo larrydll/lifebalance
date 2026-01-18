@@ -376,19 +376,30 @@ const AppContent: React.FC = () => {
           <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full border-2 border-[#f59e0b] border-dashed"></span><span className="text-[10px] font-bold text-gray-400 uppercase">目标</span></div>
         </div>
 
-        <div className="relative mt-20 mb-24 flex items-center justify-center">
-          <RadarChart dimensions={dimensions} size={220} />
+        <div className="relative mt-10 mb-16 w-full max-w-[340px] aspect-square mx-auto">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <RadarChart dimensions={dimensions} size={220} />
+          </div>
           {/* Labels positioning logic */}
           <div className="absolute inset-0 pointer-events-none">
             {dimensions.map((d, i) => {
               const angle = (Math.PI * 2 * i) / dimensions.length - Math.PI / 2;
-              const dist = 145;
-              const x = 110 + dist * Math.cos(angle);
-              const y = 110 + dist * Math.sin(angle);
+              // 距离中心点的距离
+              const dist = 135;
+              const xOffset = dist * Math.cos(angle);
+              const yOffset = dist * Math.sin(angle);
+
               return (
-                <div key={d.id} className="absolute text-center transform -translate-x-1/2 -translate-y-1/2" style={{ left: x, top: y }}>
-                  <p className="text-[10px] font-bold text-gray-500">{d.name}</p>
-                  <p className="text-xs font-bold">{d.currentScore} <span className="text-accent-orange mx-0.5">→</span> {d.targetScore}</p>
+                <div
+                  key={d.id}
+                  className="absolute text-center transform -translate-x-1/2 -translate-y-1/2 whitespace-nowrap z-10"
+                  style={{
+                    left: `calc(50% + ${xOffset}px)`,
+                    top: `calc(50% + ${yOffset}px)`
+                  }}
+                >
+                  <p className="text-xs font-bold text-gray-400">{d.name}</p>
+                  <p className="text-sm font-bold">{d.currentScore} <span className="text-accent-orange mx-0.5">→</span> {d.targetScore}</p>
                 </div>
               );
             })}
