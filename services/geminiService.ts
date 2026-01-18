@@ -111,10 +111,13 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       console.log("SDK failed, attempting raw REST API call...");
       try {
         let apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
+        // Allow custom Base URL for proxies (to bypass Vercel IP blocks)
+        const baseUrl = import.meta.env.VITE_GEMINI_API_BASE_URL || 'https://generativelanguage.googleapis.com';
+
         if (apiKey) {
           apiKey = apiKey.trim();
           // Try gemini-1.5-flash as it is the most likely to work
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          const response = await fetch(`${baseUrl}/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
