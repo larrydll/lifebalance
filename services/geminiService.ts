@@ -104,6 +104,26 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
           } else {
             const errText = await response.text();
             console.warn(`Proxy ${modelName} failed:`, errText);
+
+            // Smart Debug: If 404, try to list available models to see what IS working
+            if (response.status === 404) {
+              try {
+                console.log("Attempting to list available models for debugging...");
+                const listResponse = await fetch(`${baseUrl}/v1beta/models?key=${apiKey}`);
+                if (listResponse.ok) {
+                  const listData = await listResponse.json();
+                  const availableModels = listData.models?.map((m: any) => m.name.replace('models/', '')) || [];
+                  lastError = new Error(`Model Not Found. Available models: ${availableModels.join(', ')}`);
+                  continue; // Skip standard error setting
+                } else {
+                  lastError = new Error(`404 Error. ListModels also failed: ${await listResponse.text()}`);
+                  continue;
+                }
+              } catch (listErr) {
+                console.error("ListModels check failed", listErr);
+              }
+            }
+
             lastError = new Error(`Proxy Error [${response.status}]: ${errText.slice(0, 500)}`);
           }
         } catch (e: any) {
