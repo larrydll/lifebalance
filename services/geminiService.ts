@@ -112,7 +112,8 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       try {
         let apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.API_KEY;
         // Allow custom Base URL for proxies (to bypass Vercel IP blocks)
-        const baseUrl = import.meta.env.VITE_GEMINI_API_BASE_URL || 'https://generativelanguage.googleapis.com';
+        // Default to /api/proxy which is handled by vercel.json rewrites or vite proxy
+        const baseUrl = import.meta.env.VITE_GEMINI_API_BASE_URL || '/api/proxy';
 
         if (apiKey) {
           apiKey = apiKey.trim();
