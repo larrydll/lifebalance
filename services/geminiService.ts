@@ -27,7 +27,7 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
   const getFallbackData = (errorMsg?: string): ActionPlanItem[] => gaps.map((g, idx) => ({
     id: `plan-${idx}`,
     category: g.name,
-    title: errorMsg && idx === 0 ? `调试报错: ${errorMsg.slice(0, 20)}...` : `${g.name}: 差距为 ${g.gap}`,
+    title: idx === 0 && errorMsg ? `${g.name} (API Error)` : `${g.name}: 差距为 ${g.gap}`,
     priority: idx + 1,
     gap: g.gap,
     status: (g.gap > 5 ? 'critical' : g.gap > 2 ? 'steady' : 'moderate') as 'critical' | 'steady' | 'moderate',
@@ -48,26 +48,7 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.ARRAY,
-          items: {
-            type: SchemaType.OBJECT,
-            properties: {
-              category: { type: SchemaType.STRING },
-              title: { type: SchemaType.STRING },
-              status: { type: SchemaType.STRING },
-              tasks: {
-                type: SchemaType.ARRAY,
-                items: { type: SchemaType.STRING }
-              }
-            },
-            required: ["category", "title", "status", "tasks"]
-          }
-        }
-      }
+      model: "gemini-pro",
     });
 
     const prompt = `你是一位擅长积极心理学的资深生活教练，善于通过"成长型思维"和"优势视角"来激发用户的潜能。
@@ -97,7 +78,8 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
     const response = await result.response;
     const text = response.text();
 
-    const data = JSON.parse(text || "[]");
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const data = JSON.parse(cleanText || "[]");
 
     // Map with image placeholders
     const images = [
