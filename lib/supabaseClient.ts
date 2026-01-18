@@ -16,9 +16,15 @@ const isValidUrl = (url: string): boolean => {
 
 const hasValidConfig = isValidUrl(supabaseUrl) && supabaseAnonKey && supabaseAnonKey !== 'your-supabase-anon-key';
 
-if (!hasValidConfig) {
-  console.warn('⚠️ Supabase credentials not configured. Running in demo mode - data will not be persisted.');
-  console.warn('To enable data persistence, set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local');
+let configErrorReason = '';
+if (!isValidUrl(supabaseUrl)) configErrorReason += `URL无效(${supabaseUrl ? '格式误' : '缺失'});`;
+if (!supabaseAnonKey) configErrorReason += 'Key缺失;';
+else if (supabaseAnonKey === 'your-supabase-anon-key') configErrorReason += 'Key为默认值;';
+
+if (configErrorReason) {
+  console.warn('⚠️ Supabase credentials check failed:', configErrorReason);
+  console.warn('Current VITE_SUPABASE_URL:', supabaseUrl ? 'Set (Hidden)' : 'Not Set');
+  console.warn('Current VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set (Hidden)' : 'Not Set');
 }
 
 // Create a mock client for demo mode that returns empty results
@@ -26,8 +32,8 @@ const createMockClient = (): any => {
   const mockAuth = {
     getUser: async () => ({ data: { user: null }, error: null }),
     getSession: async () => ({ data: { session: null }, error: null }),
-    signUp: async () => ({ data: { user: null }, error: { message: 'Supabase not configured - running in demo mode' } }),
-    signInWithPassword: async () => ({ data: { user: null }, error: { message: 'Supabase not configured - running in demo mode' } }),
+    signUp: async () => ({ data: { user: null }, error: { message: `Supabase未配置: ${configErrorReason} (请检查Vercel环境变量)` } }),
+    signInWithPassword: async () => ({ data: { user: null }, error: { message: `Supabase未配置: ${configErrorReason}` } }),
     signOut: async () => ({ error: null }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
   };
