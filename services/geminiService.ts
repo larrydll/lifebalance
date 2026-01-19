@@ -181,8 +181,17 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
       throw lastError;
     }
 
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const data = JSON.parse(cleanText || "[]");
+    // Extract JSON array using regex to ignore conversational preamble (e.g. "Okay, here is the JSON...")
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    const cleanText = jsonMatch ? jsonMatch[0] : text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    let data;
+    try {
+      data = JSON.parse(cleanText || "[]");
+    } catch (parseError) {
+      console.error("JSON Parse Error:", parseError, "Raw Text:", text);
+      throw new Error("AI response was not valid JSON. Please try again.");
+    }
 
     // Map with image placeholders
     const images = [
