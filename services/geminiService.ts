@@ -76,9 +76,9 @@ export const generateActionPlan = async (dimensions: Dimension[]): Promise<Actio
 
     // Updated with models CONFIRMED to exist by ListModels debug
     const modelsToTry = [
+      "gemini-flash-latest",
       "gemini-2.0-flash",
-      "gemini-2.5-flash",
-      "gemini-flash-latest"
+      "gemini-2.5-flash"
     ];
 
     let text = "";
